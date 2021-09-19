@@ -38,7 +38,7 @@ reg_t register_uchar_to_reg(unsigned char uchar) {
   case 7:
     return edi;
   default:
-    return err;
+    return err_reg;
   }
 }
 
@@ -65,7 +65,7 @@ reg_t register_uchar_sect_to_reg(unsigned char uchar, int start_bit) {
     mask = 0xE0;
     break;
   default:
-    return err;
+    return err_reg;
   }
 
   return register_uchar_to_reg((uchar & mask) >> start_bit);
@@ -103,7 +103,7 @@ char *register_reg_to_str(reg_t reg) {
   case edi:
     str = REG_EDI_STR;
     break;
-  case err:
+  case err_reg:
     str = REG_ERR_STR;
     break;
   }

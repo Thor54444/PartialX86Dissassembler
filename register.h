@@ -15,7 +15,7 @@ typedef enum reg_t {
   ebp,
   esi,
   edi,
-  err //Indicates precense of error in a register function
+  err_reg //Indicates precense of error in a register function
 } reg_t;
 
 reg_t register_uchar_to_reg(unsigned char uchar);
