@@ -19,7 +19,7 @@
 #define REG_ERR_STR "err"
 #define REG_STR_SIZE 3
 
-reg_t uchar_to_reg(unsigned char uchar) {
+reg_t register_uchar_to_reg(unsigned char uchar) {
   switch(uchar) {
   case 0:
     return eax;
@@ -42,7 +42,7 @@ reg_t uchar_to_reg(unsigned char uchar) {
   }
 }
 
-reg_t uchar_sect_to_reg(unsigned char uchar, int start_bit) {
+reg_t register_uchar_sect_to_reg(unsigned char uchar, int start_bit) {
   unsigned char mask;
 
   switch(start_bit) {
@@ -68,10 +68,10 @@ reg_t uchar_sect_to_reg(unsigned char uchar, int start_bit) {
     return err;
   }
 
-  return uchar_to_reg((uchar & mask) >> start_bit);
+  return register_uchar_to_reg((uchar & mask) >> start_bit);
 }
 
-char *reg_to_str(reg_t reg) {
+char *register_reg_to_str(reg_t reg) {
   char *buf = calloc(REG_STR_SIZE + 1, 1), *str;
 
   if (buf == NULL) {
@@ -118,27 +118,27 @@ char *reg_to_str(reg_t reg) {
 
 int main() {
   unsigned char chr = 0x03;
-  reg_t reg = uchar_to_reg(chr);
+  reg_t reg = register_uchar_to_reg(chr);
   char *tmp;
 
   if (reg != ebx) {
     printf("Bad conversion\n");
   }
 
-  tmp = reg_to_str(reg);
+  tmp = register_reg_to_str(reg);
 
   printf("Reg str: %s\n", tmp);
 
   free(tmp);
 
-  reg = uchar_sect_to_reg(chr, 0);
+  reg = register_uchar_sect_to_reg(chr, 0);
 
   if (reg != ebx) {
     printf("Bad conversion\n");
   }
 
   chr = 0xE0;
-  reg = uchar_sect_to_reg(chr, 5);
+  reg = register_uchar_sect_to_reg(chr, 5);
 
   if (reg != edi) {
     printf("Bad conversion\n");
