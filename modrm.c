@@ -28,6 +28,10 @@ mod_t modrm_get_mod(unsigned char uchar) {
   }
 }
 
+bool modrm_use_disp(mod_t mod) {
+  return mod == byte_disp || mod == dword_disp;
+}
+
 reg_t modrm_get_reg(unsigned char uchar) {
   return register_uchar_sect_to_reg(uchar, REG_SHIFT);
 }

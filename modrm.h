@@ -18,6 +18,8 @@ typedef enum mod_t {
   err_mod
 } mod_t;
 
+bool modrm_use_disp(mod_t mod);
+
 mod_t modrm_get_mod(unsigned char uchar);
 
 reg_t modrm_get_reg(unsigned char uchar); 
