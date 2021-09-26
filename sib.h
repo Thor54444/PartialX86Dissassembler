@@ -18,6 +18,6 @@ reg_t sib_get_index(unsigned char uchar);
 
 reg_t sib_get_base(unsigned char uchar);
 
-bool sib_need_sib(op_t op, mod_t mod);
+bool sib_need_sib(op_t op, mod_t mod, reg_t reg);
 
 #endif //__SIB_H__

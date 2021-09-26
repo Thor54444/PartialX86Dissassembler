@@ -36,8 +36,8 @@ reg_t sib_get_base(unsigned char uchar) {
   return register_uchar_sect_to_reg(uchar, BASE_SHIFT);
 }
 
-bool sib_need_sib(op_t op, mod_t mod) {
-  return op_has_modrm(op) == OP_BOOL_YES && mod != direct; 
+bool sib_need_sib(op_t op, mod_t mod, reg_t rm) {
+  return op_has_modrm(op) == OP_BOOL_YES && mod != direct && rm == esp; 
 }
 
 /*#include <stdio.h>

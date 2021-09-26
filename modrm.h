@@ -24,10 +24,10 @@ reg_t modrm_get_reg(unsigned char uchar);
 
 reg_t modrm_get_rm(unsigned char uchar);
 
-bool modrm_is_special_disp_mod(mod_t mod, reg_t rm);
+bool modrm_is_special_displacement_mod(mod_t mod, reg_t rm);
 
-bool modrm_use_disp(mod_t mod, reg_t rm);
+bool modrm_has_displacement(mod_t mod, reg_t rm);
 
-int modrm_get_disp_size(mod_t mod, reg_t rm);
+int modrm_get_displacement_size(mod_t mod, reg_t rm);
 
 #endif //__MODRM_H__

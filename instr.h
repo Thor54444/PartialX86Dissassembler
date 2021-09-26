@@ -29,19 +29,12 @@ typedef struct instr_t {
   int scale;
   reg_t index;
   reg_t base;
-  union {
-    uint8_t disp_8;
-    uint32_t disp_32;
-  };
-  union {
-    uint8_t imm_8;
-    uint16_t imm_16;
-    uint32_t imm_32;
-  };
+  int32_t disp;
+  int32_t imm;
   char *label;
 } instr_t;
 
-int instr_parse_instr(unsigned char *buf, int len, instr_t *instr);
+int instr_parse_instr(unsigned char *buf, int len, instr_t **instr);
 
 char *instr_reg_to_str(instr_t reg);
 

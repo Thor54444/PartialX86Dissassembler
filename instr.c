@@ -3,212 +3,348 @@
  * Project 1
  * instr.c
  ****************************/
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "instr.h"
 
-int parse_prefix(unsigned char *buf, int max, prefix_t *prefix) {
-  if (prefix == NULL || buf == NULL || max <= 0) {
+int parse_prefix(unsigned char *buf, int max, instr_t *instr) {
+  if (buf == NULL || max <= 0 || instr == NULL) {
     return 0;
   }
 
-  *prefix = prefix_uchar_to_prefix(*buf);
+  instr->prefix = prefix_uchar_to_prefix(*buf);
 
-  if (prefix == repne) {
+  if (instr->prefix == repne) {
     return 1;
   } else {
     return 0;
   }
 }
 
-int parse_op(unsigned char *buf, unsigned max, op_t *op) {
-  op_t tmp;
-
-  if (buf == NULL || max <= 0 || op == NULL) {
+int parse_op(unsigned char *buf, int max, instr_t *instr) {
+  if (buf == NULL || max <= 0 || instr == NULL) {
     return -1;
   }
 
-  tmp = op_uchar_to_op(*buf);
-  if (tmp == err_op) {
+  instr->op = op_uchar_to_op(*buf);
+  if (instr->op == err_op) {
     return -1;
   }
 
-  // op_need_second_byte returns either yes or no
-  if (op_need_second_byte(*buf) == OP_BOOL_YES) {
+  if(op_op_has_reg(instr->op) == OP_BOOL_YES) {
+    instr->reg = op_op_get_reg(*buf);
+
+    return 1;
+  } else if (op_need_second_byte(*buf) == OP_BOOL_YES) {
     if (max < 2) {
       return -1; // Not enough bytes given to parse
     }
 
-    *op = op_uchar_uchar_to_op(*buf, *(buf + 1));
+    instr->op = op_uchar_uchar_to_op(*buf, *(buf + 1));
     return 2;
   } else {
-    *op = tmp;
     return 1;
   }
   
 }
 
-int parse_modrm(unsigned char *buf, int max, op_t op, mod_t *mod,
-		reg_t *reg, reg_t *rm, op_t *final_op) {
-  mod_t tmp_mod;
-  reg_t tmp_reg;
-  reg_t tmp_rm;
+int parse_modrm(unsigned char *buf, int max, op_t op, instr_t *instr) {
   int res = -1;
 
-  if (buf == NULL || max <= 0 || op == err_op || mod == NULL ||
-      reg == NULL || rm == NULL || final_op == NULL) {
+  if (buf == NULL || max < 0 || op == err_op || instr == NULL) {
     goto ret;
   }
 
+  printf("Parsing MODRM byte %hx\n", *buf);
+
   if(op_has_modrm(op) == OP_BOOL_YES ||
-     op_has_modrm(op) == OP_BOOL_MAYBE) {
+     (op_has_modrm(op) == OP_BOOL_MAYBE &&
+      op_need_modrm(op) == OP_BOOL_YES)) {
 
-    tmp_mod = modrm_get_mod(*buf);
-    tmp_reg = modrm_get_reg(*buf);
-    tmp_rm = modrm_get_rm(*buf);
+    if (max == 0) {
+      return -1;
+    }
+    
+    /* Either you know for sure you need an modrm
+     * or you use a modrm to identify the OP */
+    instr->mode = modrm_get_mod(*buf);
+    instr->reg = modrm_get_reg(*buf);
+    instr->rm = modrm_get_rm(*buf);
 
-    if (op_need_modrm(op)) {
-      *final_op = op_op_modrm_to_op(op, tmp_reg);
+    printf("mod: %d reg: %d rm: %d\n", instr->mode, instr->reg, instr->rm);
 
-      if (*final_op == err_op) {
+    if (op_need_modrm(op) == OP_BOOL_YES) {
+      char *tmp;
+      tmp = op_to_str(op);
+      printf("OP BEFORE RESOLUTON: %s\n", tmp);
+      free(tmp);
+      instr->op = op_op_modrm_to_op(op, instr->reg);
+      tmp = op_to_str(instr->op);
+      printf("AFTER RESOLUTION: %s\n", tmp);
+      free(tmp);
+      if (instr->op == err_op) {
+	printf("Parse error\n");
 	goto ret;
       }
-    } else {
-      *final_op = op;
+
+      instr->reg = err_reg; //Reg was used to signal the OP, effectively does not exist here
     }
 
     res = 1;
   } else {
-    tmp_mod = err_reg;
-    tmp_mod = err_mod;
-    tmp_rm = err_reg;
+    printf("No modrm\n");
     res = 0;
   }
 
-  *mod = tmp_mod;
-  *reg = tmp_reg;
-  *rm = tmp_rm;
-  
  ret:
   return res;
 }
 
 int parse_sib(unsigned char *buf, int max, op_t op, mod_t mode,
-	      int *scale, reg_t *index, reg_t *base) {
-  if (buf == NULL || max <= 0 || scale == NULL || index == NULL ||
-      base == NULL) {
+	      instr_t *instr) {
+  if (buf == NULL || max < 0 || op == err_op || instr == NULL) {
     return -1;
   }
 
-  if (sib_need_sib(op, mode)) {
-    *base = sib_get_base(*buf);
-    *index = sib_get_index(*buf);
-    *scale = sib_get_scale(*buf);
+  printf("Past SIB check\n");
 
+  if (sib_need_sib(op, mode, instr->rm)) {
+    if (max == 0) {
+      printf("Max too high\n");
+      return -1;
+    }
+    
+    instr->base = sib_get_base(*buf);
+    instr->index = sib_get_index(*buf);
+    instr->scale = sib_get_scale(*buf);
+
+    /* Cannot scale esp */
+    if (instr->base == esp && instr->index != 1) {
+      printf("Scale ESP?\n");
+      return -1;
+    }
+
+    printf("I return\n");
     return 1;
   } else {
     return 0;
   }
 }
 
-int parse_displacement(unsigned char *buf, int max, instr_t instr) {
+int parse_displacement(unsigned char *buf, int max, instr_t *instr) {
+  int8_t b_field;
   int sz = 0;
 
-  if (buf == NULL || max <= 0) {
+  if (buf == NULL || max < 0) {
     return -1;
   }
 
-  sz = modrm_get_disp_size(instr.mode, instr.rm);
+  if (modrm_has_displacement(instr->mode, instr->rm)) {
+    sz = modrm_get_displacement_size(instr->mode, instr->rm);
+  }
+  
+  if (op_has_displacement(instr->op) == OP_BOOL_YES) {
+    sz = op_get_displacement_size(instr->op);
+  }
+
+  if (sz == 0 && (op_has_displacement(instr->op) == OP_BOOL_YES ||
+		  modrm_has_displacement(instr->mode, instr->rm))) {
+    printf("Needs displacement yet no size %d %d\n", instr->mode, instr->rm);
+    return -1; // Error if a displacement should be present but one isn't
+  }
 
   if(sz == 4) {
     if (max < 4) {
+      printf("Do not have 4 bytes to make displacement out of\n");
       return -1;
     }
 
-    memcpy(&instr.disp_32, buf, 4);
+    memcpy(&instr->disp, buf, 4);
   } else if(sz == 1) {
-    memcpy(&instr.disp_8, buf, 1);
+    memcpy(&b_field, buf, 1);
+    instr->disp = b_field;
   }
 
   return sz;
 }
 
-int parse_immediate(unsigned char *buf, int max, instr_t instr) {
+int parse_immediate(unsigned char *buf, int max, instr_t *instr) {
+  int8_t b_field;
+  int16_t tb_field;
   int sz = 0;
 
-  if (buf == NULL || max <= 0) {
+  if (buf == NULL || max < 0) {
     return -1;
   }
 
-  sz = op_get_immediate_size(instr.op);
+  sz = op_get_immediate_size(instr->op);
 
+  if (sz == 0 && op_has_immediate(instr->op) == OP_BOOL_YES) {
+    printf("I need an immediate?\n");
+    return -1; // Error if an immediate should be present but none is
+  }
+  
   if (sz == 4) {
     if (max < 4) {
       return -1;
     }
 
-    memcpy(&instr.imm_32, buf, 4);
+    printf("I am copying the 32 bit immediate %"PRIu32"\n", *((uint32_t *)buf));
+
+    memcpy(&instr->imm, buf, 4);
   } else if (sz == 2) {
     if (max < 2) {
       return -1;
     }
 
-    memcpy(&instr.imm_16, buf, 2);
+    memcpy(&tb_field, buf, 2);
+    instr->imm = tb_field;
   } else if (sz == 1) {
-    memcpy(&instr.imm_8, buf, 1);
+    memcpy(&b_field, buf, 1);
+    instr->imm = b_field;
   }
 
   return sz;
 }
 
-int instr_parse_instr(unsigned char *buf, int len, instr_t *instr) {
-  instr_t inner_instr = {0};
+void clear_instr(instr_t *instr) {
+  instr->addr = 0;
+  instr->prefix = err_prefix;
+  instr->op = err_op;
+  instr->mode = err_mod;
+  instr->reg = err_reg;
+  instr->rm = err_reg;
+  instr->scale = -1;
+  instr->index = err_reg;
+  instr->base = err_reg;
+  memset(&instr->imm, 0xFF, 4);
+  memset(&instr->disp, 0xFF, 4);
+  instr->label = NULL;
+}
+
+int instr_parse_instr(unsigned char *buf, int len, instr_t **instr) {
+  instr_t inner_instr;
   int cur = 0;
   int moved = 0;
-  op_t op_tmp;
+  char *tmp;
+
+  clear_instr(&inner_instr);
 
   if (instr == NULL || buf == NULL) {
     return INSTR_BOOL_NO;
   }
 
-  cur += parse_prefix(buf, len, &inner_instr.prefix);
-  moved = parse_op(buf + cur, len - cur, &op_tmp);
+  cur += parse_prefix(buf, len, &inner_instr);
+
+  printf("Parse prefix: %d bytes\n", cur);
+  
+  moved = parse_op(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
+  tmp = op_to_str(inner_instr.op);
+  printf("Parse op %s: %d bytes\n", tmp, cur);
+  free(tmp);
   
-  moved = parse_modrm(buf + cur, len - cur, op_tmp, &inner_instr.mode,
-		      &inner_instr.reg, &inner_instr.rm, &inner_instr.op);
-
+  moved = parse_modrm(buf + cur, len - cur, inner_instr.op, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
-  cur += moved; 
+  cur += moved;
+
+  tmp = op_to_str(inner_instr.op);
+  printf("Parse modrm %s: %d bytes\n", tmp, cur);
+  free(tmp);
+
+  if ((inner_instr.op == clflush || inner_instr.op == lea)
+      && inner_instr.mode == direct) {
+    return INSTR_BOOL_NO; //Specific case written into the spec
+  }
 
   moved = parse_sib(buf + cur, len - cur, inner_instr.op, inner_instr.mode,
-		    &inner_instr.scale, &inner_instr.index,
-		    &inner_instr.base);
+		    &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
+  printf("Parse sib: %d bytes\n", cur);
 
-  moved = parse_displacement(buf + cur, len - cur, inner_instr);
+  moved = parse_displacement(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
+  printf("Parse disp: %d bytes\n", cur);
 
-  moved = parse_immediate(buf + cur, len - cur, inner_instr);
+  moved = parse_immediate(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
+  printf("Parse imm: %d bytes\n", cur);
+
+  *instr = calloc(1, sizeof(instr_t));
+  if(*instr == NULL) {
+    return INSTR_BOOL_NO;
+  }
+
+  memcpy(*instr, &inner_instr, sizeof(instr_t));
   
-  return cur;
+  return len - cur;
 }
 
 
+
 int main() {
+  int res;
+  char *tmp;
+  unsigned char instruction[] = {0x8B, 0x55, 0x08};
+  instr_t *result;
+
+  res = instr_parse_instr(instruction, sizeof(instruction), &result);
+
+  if(res < 0) {
+    printf("Instruction parsing error\n");
+    return -1;
+  } else if (res > 0) {
+    printf("More bytes remaining: %d\n", res);
+    return 1;
+  } else {
+    printf("It parsed!\n");
+  }
+
+  printf("PRINTING INSTR INFO: \n");
+  tmp = op_to_str(result->op);
+  printf("Mneumonic CODE: %s\n", tmp);
+  free(tmp);
+
+  printf("Mode: %d\n", result->mode);
+
+  tmp = register_reg_to_str(result->rm);
+  printf("RM: %d %s\n", result->rm, tmp);
+  free(tmp);
+  
+  tmp = register_reg_to_str(result->reg);
+  printf("Reg: %d %s\n", result->reg, tmp);
+  free(tmp);
+
+  tmp = register_reg_to_str(result->base);
+  printf("BASE: %d %s\n", result->base, tmp);
+  free(tmp);
+
+  tmp = register_reg_to_str(result->index);
+  printf("INDEX: %d %s\n", result->index, tmp);
+  free(tmp);
+
+  printf("Scale: %d\n", result->scale);
+  
+  printf("Displacement %"PRId32"\n", result->disp);
+  printf("Immediate: %"PRId32"\n", result->imm);
+  
+  free(result);
+  
   return 0;
 }
 

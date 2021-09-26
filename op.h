@@ -94,6 +94,7 @@ typedef enum op_t {
   /*These obviously are not true opcodes, this just represents the ambiguity with
    * parsing some opcodes in isolation */
   clflush_u, //clflush technically has an aditional value in the modrm required to confirm it
+  mov_u,
   inc_dec_call_jmp_push, //0xFF
   idiv_imul_mul_neg_not_test, //0xF7
   add_and_cmp_or_sbb_sub_xor, //0x81
@@ -125,4 +126,12 @@ int op_has_modrm(op_t op);
 int op_has_immediate(op_t op);
 
 int op_get_immediate_size(op_t op);
+
+int op_has_displacement(op_t op);
+
+int op_get_displacement_size(op_t op);
+
+int op_op_has_reg(op_t op);
+
+reg_t op_op_get_reg(unsigned char uchar);
 #endif //__OP_H__

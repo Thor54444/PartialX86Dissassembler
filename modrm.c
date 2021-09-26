@@ -36,19 +36,19 @@ reg_t modrm_get_rm(unsigned char uchar) {
   return register_uchar_sect_to_reg(uchar, RM_SHIFT);
 }
 
-bool modrm_use_disp(mod_t mod, reg_t rm) {
+bool modrm_has_displacement(mod_t mod, reg_t rm) {
   return mod == byte_disp || mod == dword_disp ||
-    modrm_is_special_disp_mod(mod, rm);
+    modrm_is_special_displacement_mod(mod, rm);
 }
 
-bool modrm_is_special_disp_mod(mod_t mod, reg_t rm) {
+bool modrm_is_special_displacement_mod(mod_t mod, reg_t rm) {
   return mod == mem_access && rm == ebp;
 }
 
-int modrm_get_disp_size(mod_t mod, reg_t rm) {
+int modrm_get_displacement_size(mod_t mod, reg_t rm) {
   switch(mod) {
   case mem_access:
-    if (modrm_is_special_disp_mod(mod, rm)) {
+    if (modrm_is_special_displacement_mod(mod, rm)) {
       return 4;
     }
     
