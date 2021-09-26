@@ -155,10 +155,30 @@ op_t op_uchar_to_op(unsigned char uchar) {
   }
 }
 
-op_t op_uchar_modrm_to_op(unsigned char op, reg_t modrm_reg_field) {
-  op_t one_op = op_uchar_to_op(op);
+op_t op_uchar_uchar_to_op(unsigned char op1, unsigned char op2) {
+  op_t one_op = op_uchar_to_op(op1);
 
   switch(one_op) {
+  case clflush_imul_jz_jnz:
+    switch(op2) {
+    case 0x84:
+      return jz32;
+    case 0x85:
+      return jnz32;
+    case 0xAE:
+      return clflush_u;
+    case 0xAF:
+      return imulr;
+    default:
+      return err_op;
+    }
+  default:
+    return err_op;
+  }
+}
+
+op_t op_op_modrm_to_op(op_t op, reg_t modrm_reg_field) {
+  switch(op) {
   case add_and_cmp_or_sbb_sub_xor:
     switch(modrm_reg_field) {
     case eax:
@@ -227,26 +247,10 @@ op_t op_uchar_modrm_to_op(unsigned char op, reg_t modrm_reg_field) {
     case edi:
       return err_op; //We don't handle the 7 case
     }
-  default:
-    return err_op;
-  }
-}
-
-op_t op_uchar_uchar_to_op(unsigned char op1, unsigned char op2) {
-  op_t one_op = op_uchar_to_op(op1);
-
-  switch(one_op) {
-  case clflush_imul_jz_jnz:
-    switch(op2) {
-    case 0x84:
-      return jz32;
-    case 0x85:
-      return jnz32;
-    case 0xAE:
-      return clflush_u;
-    case 0xAF:
-      return imulr;
-    default:
+  case clflush_u:
+    if (modrm_reg_field == edi) {
+      return clflush;
+    } else {
       return err_op;
     }
   default:
@@ -254,18 +258,16 @@ op_t op_uchar_uchar_to_op(unsigned char op1, unsigned char op2) {
   }
 }
 
+op_t op_uchar_modrm_to_op(unsigned char op, reg_t modrm_reg_field) {
+  op_t one_op = op_uchar_to_op(op);
+
+  return op_op_modrm_to_op(one_op, modrm_reg_field);
+}
+
 op_t op_uchar_uchar_modrm_to_op(unsigned char op1, unsigned char op2, reg_t modrm_reg_field) {
   op_t two_op = op_uchar_uchar_to_op(op1, op2);
 
-  switch(two_op) {
-  case clflush_u:
-    if (modrm_reg_field == edi) {
-      return clflush;
-    }
-    break;
-  }
-
-  return err_op;
+  return op_op_modrm_to_op(two_op, modrm_reg_field);
 }
 
 char *op_to_str(op_t op) {
@@ -390,7 +392,7 @@ char *op_to_str(op_t op) {
   return buf;
 }
 
-int op_has_second_byte(op_t op) {
+int op_need_second_byte(op_t op) {
   switch(op) {
   case clflush:
     return OP_BOOL_YES;
@@ -407,6 +409,67 @@ int op_has_second_byte(op_t op) {
   default:
     return OP_BOOL_NO;
   }
+}
+
+int op_need_modrm(op_t op) {
+  switch(op) {
+  case add_and_cmp_or_sbb_sub_xor:
+    return OP_BOOL_YES;
+  case sal_sar_shr:
+    return OP_BOOL_YES;
+  case idiv_imul_mul_neg_not_test:
+    return OP_BOOL_YES;
+  case inc_dec_call_jmp_push:
+    return OP_BOOL_YES;
+  case clflush_u:
+    return OP_BOOL_YES;
+  case addi:
+    return OP_BOOL_YES;
+  case andi:
+    return OP_BOOL_YES;
+  case callm:
+    return OP_BOOL_YES;
+  case clflush:
+    return OP_BOOL_YES;
+  case cmpi:
+    return OP_BOOL_YES;
+  case decm:
+    return OP_BOOL_YES;
+  case idiv:
+    return OP_BOOL_YES;
+  case imulm:
+    return OP_BOOL_YES;
+  case incm:
+    return OP_BOOL_YES;
+  case jmpm:
+    return OP_BOOL_YES;
+  case movi:
+    return OP_BOOL_YES;
+  case ori:
+    return OP_BOOL_YES;
+  case popm:
+    return OP_BOOL_YES;
+  case pushm:
+    return OP_BOOL_YES;
+  case sal:
+    return OP_BOOL_YES;
+  case sar:
+    return OP_BOOL_YES;
+  case shr:
+    return OP_BOOL_YES;
+  case sbbi:
+    return OP_BOOL_YES;
+  case subi:
+    return OP_BOOL_YES;
+  case testi:
+    return OP_BOOL_YES;
+  case xori:
+    return OP_BOOL_YES;
+  default:
+    break;
+  }
+
+  return OP_BOOL_NO;
 }
 
 int op_has_modrm(op_t op) {
@@ -456,6 +519,51 @@ int op_has_modrm(op_t op) {
   }
 
   return OP_BOOL_NO;
+}
+
+int op_get_immediate_size(op_t op) {
+  switch(op) {
+  case addd ... addi:
+    return 4;
+  case andd ... andi:
+    return 4;
+  case callr:
+    return 4;
+  case cmpd ...cmpi:
+    return 4;
+  case imuli:
+    return 4;
+  case jmp8:
+    return 1;
+  case jmpr:
+    return 4;
+  case jz8:
+    return 1;
+  case jnz32:
+    return 4;
+  case movd ... movi:
+    return 1;
+  case ord ... ori:
+    return 4;
+  case out:
+    return 1;
+  case pushi:
+    return 4;
+  case retfi:
+    return 2;
+  case retni:
+    return 2;
+  case sbbd ... sbbi:
+    return 32;
+  case subd ... subi:
+    return 32;
+  case testd ... testi:
+    return 32;
+  case xord ... xori:
+    return 32;
+  default:
+    return 0;
+  }
 }
 
 int op_has_immediate(op_t op) {

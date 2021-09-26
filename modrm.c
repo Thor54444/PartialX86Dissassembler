@@ -28,10 +28,6 @@ mod_t modrm_get_mod(unsigned char uchar) {
   }
 }
 
-bool modrm_use_disp(mod_t mod) {
-  return mod == byte_disp || mod == dword_disp;
-}
-
 reg_t modrm_get_reg(unsigned char uchar) {
   return register_uchar_sect_to_reg(uchar, REG_SHIFT);
 }
@@ -40,8 +36,32 @@ reg_t modrm_get_rm(unsigned char uchar) {
   return register_uchar_sect_to_reg(uchar, RM_SHIFT);
 }
 
-bool modrm_is_disp_mod(unsigned char uchar) {
-  return modrm_get_mod(uchar) == mem_access && modrm_get_rm(uchar) == ebp;
+bool modrm_use_disp(mod_t mod, reg_t rm) {
+  return mod == byte_disp || mod == dword_disp ||
+    modrm_is_special_disp_mod(mod, rm);
+}
+
+bool modrm_is_special_disp_mod(mod_t mod, reg_t rm) {
+  return mod == mem_access && rm == ebp;
+}
+
+int modrm_get_disp_size(mod_t mod, reg_t rm) {
+  switch(mod) {
+  case mem_access:
+    if (modrm_is_special_disp_mod(mod, rm)) {
+      return 4;
+    }
+    
+    break;
+  case byte_disp:
+    return 1;
+  case dword_disp:
+    return 4;
+  default:
+    break;
+  }
+
+  return 0;
 }
 
 /*#include <stdio.h>

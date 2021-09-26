@@ -104,18 +104,25 @@ typedef enum op_t {
 
 op_t op_uchar_to_op(unsigned char uchar);
 
-op_t op_uchar_modrm_to_op(unsigned char op, reg_t modrm_reg_field);
-
 op_t op_uchar_uchar_to_op(unsigned char op1, unsigned char op2);
+
+op_t op_op_modrm_to_op(op_t op, reg_t modrm_reg_field);
+
+op_t op_uchar_modrm_to_op(unsigned char op, reg_t modrm_reg_field);
 
 op_t op_uchar_uchar_modrm_to_op(unsigned char op1, unsigned char op2, reg_t modrm_reg_field);
 
 char *op_to_str(op_t op);
 
-int op_has_second_byte(op_t op);
+int op_need_second_byte(op_t op);
 
+/* Instructions that need the modrm byte to be fully identified */
+int op_need_modrm(op_t op);
+
+/* Instructions that have a modrm byte */
 int op_has_modrm(op_t op);
 
 int op_has_immediate(op_t op);
 
+int op_get_immediate_size(op_t op);
 #endif //__OP_H__
