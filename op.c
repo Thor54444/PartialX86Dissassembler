@@ -611,7 +611,9 @@ int op_has_immediate(op_t op) {
 
 int op_has_displacement(op_t op) {
   switch(op) {
-   case jmp8 ... jmpr:
+  case callr:
+    return OP_BOOL_YES;
+  case jmp8 ... jmpr:
     return OP_BOOL_YES;
   case jz8 ... jnz32:
     return OP_BOOL_YES;
@@ -622,6 +624,8 @@ int op_has_displacement(op_t op) {
 
 int op_get_displacement_size(op_t op) {
   switch(op) {
+  case callr:
+    return 4;
   case jmp8:
     return 1;
   case jmpr:
@@ -663,6 +667,136 @@ switch(uchar) {
  default:
    return err_reg;
   }    
+}
+
+int op_op_arg_polarity(op_t op) {
+  switch(op) {
+  case addd:
+    return OP_ARG_POL_NONE;
+  case addi:
+    return OP_ARG_POL_LEFT;
+  case addm:
+    return OP_ARG_POL_LEFT;
+  case addr:
+    return OP_ARG_POL_RIGHT;
+  case andd:
+    return OP_ARG_POL_NONE;
+  case andi:
+    return OP_ARG_POL_LEFT;
+  case andm:
+    return OP_ARG_POL_LEFT;
+  case andr:
+    return OP_ARG_POL_RIGHT;
+  case callr:
+    return OP_ARG_POL_NONE;
+  case callm:
+    return OP_ARG_POL_ONLY;
+  case clflush:
+    return OP_ARG_POL_ONLY;
+  case cmpd:
+    return OP_ARG_POL_NONE;
+  case cmpi:
+    return OP_ARG_POL_LEFT;
+  case cmpm:
+    return OP_ARG_POL_LEFT;
+  case cmpr:
+    return OP_ARG_POL_RIGHT;
+  case decm:
+    return OP_ARG_POL_ONLY;
+  case decr:
+    return OP_ARG_POL_NONE;
+  case idiv:
+    return OP_ARG_POL_ONLY;
+  case imulm:
+    return OP_ARG_POL_ONLY;
+  case imulr:
+    return OP_ARG_POL_RIGHT;
+  case imuli:
+    return OP_ARG_POL_RIGHT;
+  case incm:
+    return OP_ARG_POL_ONLY;
+  case incr:
+    return OP_ARG_POL_NONE;
+  case jmp8 ... jmpr:
+    return OP_ARG_POL_NONE;
+  case jmpm:
+    return OP_ARG_POL_NONE;
+  case jz8 ... jnz32:
+    return OP_ARG_POL_NONE;
+  case lea:
+    return OP_ARG_POL_ONLY;
+  case movd:
+    return OP_ARG_POL_NONE;
+  case movi:
+    return OP_ARG_POL_LEFT;
+  case movm:
+    return OP_ARG_POL_LEFT;
+  case movr:
+    return OP_ARG_POL_RIGHT;
+  case movsd:
+    return OP_ARG_POL_NONE;
+  case mul:
+    return OP_ARG_POL_ONLY;
+  case neg:
+    return OP_ARG_POL_ONLY;
+  case nop:
+    return OP_ARG_POL_NONE;
+  case not:
+    return OP_ARG_POL_ONLY;
+  case ord:
+    return OP_ARG_POL_NONE;
+  case ori:
+    return OP_ARG_POL_LEFT;
+  case orm:
+    return OP_ARG_POL_LEFT;
+  case orr:
+    return OP_ARG_POL_RIGHT;
+  case out:
+    return OP_ARG_POL_NONE;
+  case popm:
+    return OP_ARG_POL_ONLY;
+  case popr:
+    return OP_ARG_POL_NONE;
+  case pushm:
+    return OP_ARG_POL_ONLY;
+  case pushr ... retni:
+    return OP_ARG_POL_NONE;
+  case sal ... shr:
+    return OP_ARG_POL_LEFT;
+  case sbbd:
+    return OP_ARG_POL_NONE;
+  case sbbi:
+    return OP_ARG_POL_LEFT;
+  case sbbm:
+    return OP_ARG_POL_LEFT;
+  case sbbr:
+    return OP_ARG_POL_RIGHT;
+  case subd:
+    return OP_ARG_POL_NONE;
+  case subi:
+    return OP_ARG_POL_LEFT;
+  case subm:
+    return OP_ARG_POL_LEFT;
+  case subr:
+    return OP_ARG_POL_RIGHT;
+  case testd:
+    return OP_ARG_POL_NONE;
+  case testi:
+    return OP_ARG_POL_LEFT;
+  case testm:
+    return OP_ARG_POL_LEFT;
+  case xord:
+    return OP_ARG_POL_NONE;
+  case xori:
+    return OP_ARG_POL_LEFT;
+  case xorm:
+    return OP_ARG_POL_LEFT;
+  case xorr:
+    return OP_ARG_POL_RIGHT;
+  default:
+    return OP_ARG_POL_UNSURE;
+    break;
+  }
 }
 
 /*#include <stdio.h>

@@ -21,6 +21,8 @@
 
 typedef struct instr_t {
   uint32_t addr;
+  int size;
+  unsigned char *instr_bytes;
   prefix_t prefix;
   op_t op;
   mod_t mode;
@@ -29,13 +31,17 @@ typedef struct instr_t {
   int scale;
   reg_t index;
   reg_t base;
-  int32_t disp;
-  int32_t imm;
+  uint32_t disp;
+  uint32_t imm;
   char *label;
+  uint32_t dst_addr;
 } instr_t;
 
-int instr_parse_instr(unsigned char *buf, int len, instr_t **instr);
+int instr_parse_instr(unsigned char *buf, int len, uint32_t start_addr, instr_t **instr);
+
+void instr_clear_instr(instr_t *instr);
+
+void instr_free_instr(instr_t **instr_ptr);
 
 char *instr_reg_to_str(instr_t reg);
-
 #endif //__INSTR_H__

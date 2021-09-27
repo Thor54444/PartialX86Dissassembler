@@ -12,6 +12,12 @@
 #define OP_BOOL_YES 0
 #define OP_BOOL_NO -1
 
+#define OP_ARG_POL_ONLY 0
+#define OP_ARG_POL_LEFT 1
+#define OP_ARG_POL_RIGHT 2
+#define OP_ARG_POL_UNSURE 3
+#define OP_ARG_POL_NONE 4
+
 typedef enum op_t {
   /* Obviously, each opcode isn't technically
    * duplicated like this, but this helps have
@@ -134,4 +140,6 @@ int op_get_displacement_size(op_t op);
 int op_op_has_reg(op_t op);
 
 reg_t op_op_get_reg(unsigned char uchar);
+
+int op_op_arg_polarity(op_t op);
 #endif //__OP_H__

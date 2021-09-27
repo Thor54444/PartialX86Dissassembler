@@ -5,8 +5,12 @@
  ****************************/
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "instr.h"
+
+#define LABEL_MAX_LEN 17
+#define JMP_LABEL_FMT "offset_%08" PRIx32 "h"
 
 int parse_prefix(unsigned char *buf, int max, instr_t *instr) {
   if (buf == NULL || max <= 0 || instr == NULL) {
@@ -56,8 +60,6 @@ int parse_modrm(unsigned char *buf, int max, op_t op, instr_t *instr) {
     goto ret;
   }
 
-  printf("Parsing MODRM byte %hx\n", *buf);
-
   if(op_has_modrm(op) == OP_BOOL_YES ||
      (op_has_modrm(op) == OP_BOOL_MAYBE &&
       op_need_modrm(op) == OP_BOOL_YES)) {
@@ -72,19 +74,10 @@ int parse_modrm(unsigned char *buf, int max, op_t op, instr_t *instr) {
     instr->reg = modrm_get_reg(*buf);
     instr->rm = modrm_get_rm(*buf);
 
-    printf("mod: %d reg: %d rm: %d\n", instr->mode, instr->reg, instr->rm);
-
     if (op_need_modrm(op) == OP_BOOL_YES) {
-      char *tmp;
-      tmp = op_to_str(op);
-      printf("OP BEFORE RESOLUTON: %s\n", tmp);
-      free(tmp);
       instr->op = op_op_modrm_to_op(op, instr->reg);
-      tmp = op_to_str(instr->op);
-      printf("AFTER RESOLUTION: %s\n", tmp);
-      free(tmp);
+
       if (instr->op == err_op) {
-	printf("Parse error\n");
 	goto ret;
       }
 
@@ -93,7 +86,6 @@ int parse_modrm(unsigned char *buf, int max, op_t op, instr_t *instr) {
 
     res = 1;
   } else {
-    printf("No modrm\n");
     res = 0;
   }
 
@@ -107,11 +99,8 @@ int parse_sib(unsigned char *buf, int max, op_t op, mod_t mode,
     return -1;
   }
 
-  printf("Past SIB check\n");
-
   if (sib_need_sib(op, mode, instr->rm)) {
     if (max == 0) {
-      printf("Max too high\n");
       return -1;
     }
     
@@ -119,13 +108,6 @@ int parse_sib(unsigned char *buf, int max, op_t op, mod_t mode,
     instr->index = sib_get_index(*buf);
     instr->scale = sib_get_scale(*buf);
 
-    /* Cannot scale esp */
-    if (instr->base == esp && instr->index != 1) {
-      printf("Scale ESP?\n");
-      return -1;
-    }
-
-    printf("I return\n");
     return 1;
   } else {
     return 0;
@@ -150,13 +132,11 @@ int parse_displacement(unsigned char *buf, int max, instr_t *instr) {
 
   if (sz == 0 && (op_has_displacement(instr->op) == OP_BOOL_YES ||
 		  modrm_has_displacement(instr->mode, instr->rm))) {
-    printf("Needs displacement yet no size %d %d\n", instr->mode, instr->rm);
     return -1; // Error if a displacement should be present but one isn't
   }
 
   if(sz == 4) {
     if (max < 4) {
-      printf("Do not have 4 bytes to make displacement out of\n");
       return -1;
     }
 
@@ -181,7 +161,6 @@ int parse_immediate(unsigned char *buf, int max, instr_t *instr) {
   sz = op_get_immediate_size(instr->op);
 
   if (sz == 0 && op_has_immediate(instr->op) == OP_BOOL_YES) {
-    printf("I need an immediate?\n");
     return -1; // Error if an immediate should be present but none is
   }
   
@@ -189,8 +168,6 @@ int parse_immediate(unsigned char *buf, int max, instr_t *instr) {
     if (max < 4) {
       return -1;
     }
-
-    printf("I am copying the 32 bit immediate %"PRIu32"\n", *((uint32_t *)buf));
 
     memcpy(&instr->imm, buf, 4);
   } else if (sz == 2) {
@@ -208,8 +185,38 @@ int parse_immediate(unsigned char *buf, int max, instr_t *instr) {
   return sz;
 }
 
-void clear_instr(instr_t *instr) {
+int parse_jmp(instr_t *instr) {
+  uint64_t mask = 0x00000000FFFFFFFF;
+  uint64_t tmp = instr->addr + instr->size + instr->disp;
+  char *label;
+  int amt;
+
+  // Only the instructions that inheritly need a
+  // displacement have jmp labels
+  if (op_has_displacement(instr->op) == OP_BOOL_YES) {
+    instr->dst_addr = (uint32_t)(tmp & mask);
+
+    label = calloc(LABEL_MAX_LEN, 1);
+    if (label == NULL) {
+      return -1;
+    }
+
+    amt = snprintf(label, LABEL_MAX_LEN, JMP_LABEL_FMT, instr->dst_addr);
+    if (amt != LABEL_MAX_LEN - 1) {
+      return -1;
+    }
+  } else {
+    return 0;
+  }
+
+  instr->label = label;
+  return 0;
+}
+
+void instr_clear_instr(instr_t *instr) {
   instr->addr = 0;
+  instr->size = 0;
+  instr->instr_bytes = NULL;
   instr->prefix = err_prefix;
   instr->op = err_op;
   instr->mode = err_mod;
@@ -221,42 +228,49 @@ void clear_instr(instr_t *instr) {
   memset(&instr->imm, 0xFF, 4);
   memset(&instr->disp, 0xFF, 4);
   instr->label = NULL;
+  instr->dst_addr = 0;
 }
 
-int instr_parse_instr(unsigned char *buf, int len, instr_t **instr) {
+void instr_free_instr(instr_t **instr_ptr) {
+  instr_t *instr;
+
+  if (instr_ptr == NULL || *instr_ptr == NULL) {
+    return;
+  }
+  
+  instr = *instr_ptr;
+
+  free(instr->label);
+  free(instr->instr_bytes);
+  free(instr);
+}
+
+int instr_parse_instr(unsigned char *buf, int len, uint32_t start_addr, instr_t **instr) {
   instr_t inner_instr;
   int cur = 0;
   int moved = 0;
-  char *tmp;
-
-  clear_instr(&inner_instr);
 
   if (instr == NULL || buf == NULL) {
     return INSTR_BOOL_NO;
   }
 
+  instr_clear_instr(&inner_instr);
+
+  inner_instr.addr = start_addr;
+
   cur += parse_prefix(buf, len, &inner_instr);
 
-  printf("Parse prefix: %d bytes\n", cur);
-  
   moved = parse_op(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
-  tmp = op_to_str(inner_instr.op);
-  printf("Parse op %s: %d bytes\n", tmp, cur);
-  free(tmp);
   
   moved = parse_modrm(buf + cur, len - cur, inner_instr.op, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
-
-  tmp = op_to_str(inner_instr.op);
-  printf("Parse modrm %s: %d bytes\n", tmp, cur);
-  free(tmp);
 
   if ((inner_instr.op == clflush || inner_instr.op == lea)
       && inner_instr.mode == direct) {
@@ -269,41 +283,412 @@ int instr_parse_instr(unsigned char *buf, int len, instr_t **instr) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
-  printf("Parse sib: %d bytes\n", cur);
 
   moved = parse_displacement(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
-  printf("Parse disp: %d bytes\n", cur);
 
   moved = parse_immediate(buf + cur, len - cur, &inner_instr);
   if (moved < 0) {
     return INSTR_BOOL_NO;
   }
   cur += moved;
-  printf("Parse imm: %d bytes\n", cur);
 
-  *instr = calloc(1, sizeof(instr_t));
-  if(*instr == NULL) {
-    return INSTR_BOOL_NO;
+  if (len - cur == 0) {
+    inner_instr.size = len;
+    moved = parse_jmp(&inner_instr);
+    if(moved < 0) {
+      return INSTR_BOOL_NO;
+    }
+
+    inner_instr.instr_bytes = malloc(len);
+    if (inner_instr.instr_bytes == NULL) {
+      free(inner_instr.label);
+      return INSTR_BOOL_NO;
+    }
+
+    memcpy(inner_instr.instr_bytes, buf, len);
+    
+    *instr = calloc(sizeof(instr_t), 1);
+    if(*instr == NULL) {
+      free(inner_instr.label);
+      free(inner_instr.instr_bytes);
+      return INSTR_BOOL_NO;
+    }
+
+    memcpy(*instr, &inner_instr, sizeof(instr_t));
   }
-
-  memcpy(*instr, &inner_instr, sizeof(instr_t));
   
   return len - cur;
 }
 
+#define REG_ALONE_FORMAT "%s"
+#define REG_ACCESS_FORMAT "dword [ %s ]"
+#define REG_BYTE_FORMAT "[%s+0x%02"PRIu8"]"
+#define REG_DWORD_FORMAT "[%s+0x%08"PRIx32"]"
+#define REG_SPECIAL_FORMAT "[0x%08"PRIx32"]"
+#define REG_SIB_BASE_NO_SCALE_FORMAT "[%s+%s+0x%08"PRIx32"]"
+#define REG_SIB_BASE_FORMAT "[%s+%s]"
+#define REG_SCALE_INDEX_FORMAT "[%s*%d+%s]"
+#define REG_FULL_SIB_FORMAT "[%s*%d+%s+0x%08"PRIx32"]"
 
+#define MAX_RM_LINE_LENGTH 50
+
+int rm_to_str(instr_t reg, char **str_ptr) {
+  int res = 0;
+  char *rm = NULL;
+  char *base = NULL;
+  char *index = NULL;
+  char *buf = NULL;
+  char tmp[MAX_RM_LINE_LENGTH] = {0};
+
+  if (str_ptr == NULL) {
+    goto err;
+  }
+
+  if (reg.rm == err_reg) {
+    return 0;
+  }
+
+  rm = register_reg_to_str(reg.rm);
+  if (rm == NULL) {
+    goto err;
+  }
+
+  if (modrm_is_special_displacement_mod(reg.mode, reg.rm)) {
+    res = sprintf(tmp, REG_SPECIAL_FORMAT, reg.disp);
+
+    goto str_check;
+  }
+  
+  if (sib_need_sib(reg.op, reg.mode, reg.rm)) {
+    base = register_reg_to_str(reg.base);
+    if (base == NULL) {
+      goto err_with_rm;
+    }
+
+    if (reg.index == esp) {
+      res = sprintf(tmp, REG_DWORD_FORMAT, base, reg.disp);
+    } else {
+      index = register_reg_to_str(reg.index);
+      if (index == NULL) {
+	free(base);
+	goto err_with_rm;
+      }
+      
+      if (reg.scale > 1) {
+	if (reg.disp != UINT32_MAX) {
+	  res = sprintf(tmp, REG_FULL_SIB_FORMAT, index, reg.scale, base, reg.disp);
+	}  else {
+	  res = sprintf(tmp, REG_SCALE_INDEX_FORMAT, index, reg.scale, base);
+	}
+      } else {
+	if (reg.disp != UINT32_MAX) {
+	  res = sprintf(tmp, REG_SIB_BASE_NO_SCALE_FORMAT, index, base, reg.disp);
+	} else {
+	  res = sprintf(tmp, REG_SIB_BASE_FORMAT, index, base);
+	}
+      }
+      
+      free(base);
+    }
+
+    goto str_check;
+  }
+ 
+
+  if (reg.mode == mem_access) {
+    res = sprintf(tmp, REG_ACCESS_FORMAT, rm);
+  } else if (reg.mode == byte_disp) {
+    //res = sprintf(tmp, REG_BYTE_FORMAT, rm, (uint8_t)reg.disp);
+    //The byte format is printed like the dword for some reason
+    res = sprintf(tmp, REG_DWORD_FORMAT, rm, reg.disp);
+  } else if (reg.mode == dword_disp) {
+    res = sprintf(tmp, REG_DWORD_FORMAT, rm, reg.disp);
+  } else if (reg.mode == direct) {
+    res = sprintf(tmp, REG_ALONE_FORMAT, rm);
+  } else {
+    goto err_with_rm;
+  }
+
+ str_check:
+  if (res < 0) {
+    goto err_with_rm;
+  }
+
+  buf = calloc(strlen(tmp) + 1, 1);
+  if (buf == NULL) {
+    goto err_with_rm;
+  }
+
+  memcpy(buf, tmp, strlen(tmp));
+  free(rm);
+
+  *str_ptr = buf;
+
+  return 0;
+
+ err_with_rm:
+  free(rm);
+ err:
+  return -1;
+}
+
+#define INSTR_BYTES_SEC_MAX 18
+#define MAX_INSTR_LINE_SIZE 256
+#define DB_FORMAT_STR "db %hx"
+#define EAX_ARG_STR "eax, "
+#define EAX_LAST_ARG_STR ", eax"
+
+char *instr_reg_to_str(instr_t reg) {
+  int i;
+  int res;
+  int loc = 0;
+  char *addr = NULL;
+  char *prefix = NULL;
+  char *op = NULL;
+  char *rm = NULL;
+  char *re = NULL;
+  char *imm = NULL;
+  char *buf = NULL;
+  char tmp[MAX_INSTR_LINE_SIZE] = {0};
+
+  addr = calloc(8 + 1, 1);
+  if (addr == NULL) {
+    goto err;
+  }
+
+  res = sprintf(addr, "%08"PRIx32"", reg.addr);
+  if (res < 0) {
+    goto err_with_addr;
+  }
+
+  printf("ADDRESS: %s\n", addr);
+  
+  if (reg.op == err_op) {
+    // db: byte
+    goto make_instr;
+  }
+
+  if (reg.prefix != err_prefix) {
+    prefix = prefix_to_str(reg.prefix);
+    if (prefix == NULL) {
+      goto err_with_addr;
+    }
+  }
+
+  op = op_to_str(reg.op);
+  if (op == NULL) {
+    goto err_with_prefix;
+  }
+
+  printf("HERE IS MY OP: %s\n", op);
+
+  res = rm_to_str(reg, &rm);
+  if (res < 0) {
+    goto err_with_op;
+  }
+
+  printf("HERE IS MY RM %s\n", rm);
+  
+  if (reg.reg != err_reg) {
+    re = register_reg_to_str(reg.reg);
+    if (re == NULL) {
+      goto err_with_rm;
+    }
+  }
+
+  if (reg.imm != UINT32_MAX) {
+    imm = calloc(8 + 2 + 1, 1);
+    if (imm == NULL) {
+      goto err_with_reg;
+    }
+
+    //Instructions say to only handle immediates as 32bit or 16
+    if (reg.op == retni || reg.op == retfi) {
+      res = sprintf(imm, "0x%04"PRIx16"", (uint16_t)reg.imm);
+    } else if (false && reg.op == out) {
+      res = sprintf(imm, "0x%02"PRIx8"", (uint8_t)reg.imm);
+    } else {
+      res = sprintf(imm, "0x%08"PRIx32"", reg.imm);
+    }
+
+    if (res < 0) {
+      goto err_with_imm;
+    }
+  }
+
+  printf("After immediate\n");
+
+ make_instr:  
+  memcpy(tmp, addr, 8);
+  loc += 8;
+
+  tmp[loc++] = ':';
+
+  memset(tmp + loc, ' ', 2);
+  loc += 2;
+
+  for(i = 0; i < reg.size; i++) {
+    res = sprintf(tmp + loc, "%02X", reg.instr_bytes[i]);
+    loc += 2;
+
+    if (res < 0) {
+      goto err_with_addr;
+    }
+  }
+
+  memset(tmp + loc, ' ', INSTR_BYTES_SEC_MAX - (reg.size * 2));
+  loc = loc + (INSTR_BYTES_SEC_MAX - (reg.size * 2));
+
+  if (prefix != NULL) {
+    memcpy(tmp + loc, prefix, strlen(prefix));
+    loc += strlen(prefix);
+    tmp[loc++] = ' ';
+  }
+  
+  if (op == NULL) {
+    res = sprintf(tmp + loc, DB_FORMAT_STR, reg.instr_bytes[0]);
+    loc += 5;
+    
+    if (res < 0) {
+      // Only got here with db condition
+      goto err_with_addr;
+    }
+
+    goto make_return;
+  } else {
+    memcpy(tmp + loc, op, strlen(op));
+    loc += strlen(op);
+    tmp[loc++] = ' ';
+  }
+
+  printf("LABEL: %s\n", reg.label);
+  
+  if (reg.label != NULL) {
+    memcpy(tmp + loc, reg.label, strlen(reg.label));
+    loc += strlen(reg.label);
+    printf("Skipping...\n");
+    goto make_return;
+  }
+
+  /*#define OP_ARG_POL_ONLY 0
+  #define OP_ARG_POL_LEFT 1
+  #define OP_ARG_POL_RIGHT 2
+  #define OP_ARG_POL_UNSURE 3
+  #define OP_ARG_POL_NONE 4*/
+
+  res = op_op_arg_polarity(reg.op);
+
+  printf("After pol func %d\n", res);
+  if (res == OP_ARG_POL_RIGHT) {
+    printf("RIGHT\n");
+    memcpy(tmp + loc, re, strlen(re));
+    loc += strlen(re);
+    tmp[loc++] = ',';
+    //tmp[loc++] = ' ';
+
+    memcpy(tmp + loc, rm, strlen(rm));
+    loc += strlen(rm);
+
+    if (imm != NULL) {
+      tmp[loc++] = ',';
+      //tmp[loc++] = ' ';
+
+      memcpy(tmp + loc, imm, strlen(imm));
+      loc += strlen(imm);
+    }
+  } else if (res == OP_ARG_POL_LEFT) {
+    printf("LEFT\n");
+    memcpy(tmp + loc, rm, strlen(rm));
+    loc += strlen(rm);
+
+    tmp[loc++] = ',';
+    //tmp[loc++] = ' ';
+
+    // Either the immediate or reg field or 1 will be here
+    if (re != NULL) {
+      memcpy(tmp + loc, re, strlen(re));
+      loc += strlen(re);
+    } else if (imm != NULL){
+      memcpy(tmp + loc, imm, strlen(imm));
+      loc += strlen(imm);
+    } else {
+      //sal, sar, shr
+      tmp[loc++] = '1';
+    }
+  } else if (res == OP_ARG_POL_ONLY) {
+    printf("ONLY\n");
+    memcpy(tmp + loc, rm, strlen(rm));
+    loc += strlen(rm);
+
+    if (imm != NULL) {
+      tmp[loc++] = ',';
+      //tmp[loc++] = ' ';
+ 
+      memcpy(tmp + loc, imm, strlen(imm));
+      loc += strlen(imm);
+    }
+  } else if (res == OP_ARG_POL_NONE) {
+    printf("Here?\n");
+    /* Instructions where the register is hardcoded eax */
+    if (reg.op == addd || reg.op == andd || reg.op == cmpd || reg.op == movd ||
+	reg.op == ord || reg.op == sbbd || reg.op == subd || reg.op == testd ||
+	reg.op == xord) {
+      memcpy(tmp + loc, EAX_ARG_STR, strlen(EAX_ARG_STR));
+      loc += strlen(EAX_ARG_STR);
+
+      memcpy(tmp + loc, imm, strlen(imm));
+      loc += strlen(imm);
+    } else if (reg.op == decr || reg.op == incr || reg.op == popr || reg.op == pushr) {
+      memcpy(tmp + loc, re, strlen(re));
+      loc += strlen(re);
+    } else if (imm != NULL) {
+      printf("Here?\n");
+      memcpy(tmp + loc, imm, strlen(imm));
+      loc += strlen(imm);
+      
+      if (reg.op == out) {
+	memcpy(tmp + loc, EAX_LAST_ARG_STR, strlen(EAX_LAST_ARG_STR));
+	loc += strlen(EAX_LAST_ARG_STR);
+      }
+    }
+  } else {
+    printf("Not a match???");
+    goto err_with_imm;
+  }
+
+ make_return:
+  printf("TMP CONTAINS: %s\n", tmp);
+  buf = calloc(strlen(tmp) + 1, 1);
+  if (buf != NULL) {
+    memcpy(buf, tmp, strlen(tmp));
+  }
+ err_with_imm:
+  free(imm);
+ err_with_reg:
+  free(re);
+ err_with_rm:
+  free(rm);
+ err_with_op:
+  free(op);
+ err_with_prefix:
+  free(prefix);
+ err_with_addr:
+  free(addr);
+ err:
+  return buf;
+}
 
 int main() {
   int res;
-  char *tmp;
-  unsigned char instruction[] = {0x8B, 0x55, 0x08};
+  char *tmp, *instr_str;
+  unsigned char instruction[] = {0x5D};
   instr_t *result;
 
-  res = instr_parse_instr(instruction, sizeof(instruction), &result);
+  res = instr_parse_instr(instruction, sizeof(instruction), 0, &result);
 
   if(res < 0) {
     printf("Instruction parsing error\n");
@@ -342,8 +727,16 @@ int main() {
   
   printf("Displacement %"PRId32"\n", result->disp);
   printf("Immediate: %"PRId32"\n", result->imm);
+
+  if (result->label != NULL) {
+    printf("LABEL: %s\n", result->label);
+  }
+
+  instr_str = instr_reg_to_str(*result);
+  printf("INSTRUCTION LINE: \n%s\n", instr_str);
+  free(instr_str);
   
-  free(result);
+  instr_free_instr(&result);
   
   return 0;
 }
