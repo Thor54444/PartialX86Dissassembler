@@ -1,0 +1,28 @@
+Project 1
+Andrew Guinn
+695.744
+
+This directory constitutes the contents of my submission for Project 1.
+
+The project is written in C. I did not download any new libraries, so as long as you
+have gcc and make you should be able to build this project. The project comes with a basic
+Makefile. Simply invoke `make` on the command line to build disasm and invoke `make clean`
+to remove disasm. The binary should be runnable with the one argument given in the project spec.
+
+A quick summary of the files and their contents:
+register.c/.h - functions and types relevant to register parsing
+modrm.c/.h - functions and types relevant to modrm byte parsing
+sib.c/.h - functions and types relevant to sib byte parsing
+prefix.c/.h - functions and types relevant to prefix parsing
+op.c/.h - functions and types relevant to opcode parsing
+instr.c/.h - functions and types relevant to full instruction parsing
+lin.c/.h - implementation of the linear sweep dissassembly algorithm
+label.c/.h - implementation of a supporting struct that holds labels and corresponding addresses for the
+             printing step
+list.c/.h - barebones implementation of a linked list with desired functionality
+main.c/.h - main; handles command line input and instruction printing
+
+This directory is also a local git repo, so the full history of development should also be browsable, if
+so desired.
+
+The written response document is also located in this directory in the file "guinn_proj1_submission.pdf."
