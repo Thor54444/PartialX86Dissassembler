@@ -43,29 +43,3 @@ bool sib_need_sib(op_t op, mod_t mod, reg_t rm)
 {
     return op_has_modrm(op) == OP_BOOL_YES && mod != direct && rm == esp;
 }
-
-/*#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-  unsigned char uchar = 0xF7;
-  reg_t index, base;
-  int scale;
-  char *index_str, *base_str;
-
-  scale = sib_get_scale(uchar);
-
-  index = sib_get_index(uchar);
-  base = sib_get_base(uchar);
-
-  index_str = register_reg_to_str(index);
-  base_str = register_reg_to_str(base);
-
-  printf("Scale: %d Index: %s Base: %s\n", scale,
-	 index_str, base_str);
-
-  free(index_str);
-  free(base_str);
-
-  return 0;
-  }*/

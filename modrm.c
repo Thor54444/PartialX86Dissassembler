@@ -69,32 +69,3 @@ int modrm_get_displacement_size(mod_t mod, reg_t rm)
 
     return 0;
 }
-
-/*#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-  bool special;
-  unsigned char uchar = 0xC2;
-  reg_t reg, rm;
-  mod_t mod;
-  char *reg_str, *rm_str;
-
-  mod = modrm_get_mod(uchar);
-
-  reg = modrm_get_reg(uchar);
-  rm = modrm_get_rm(uchar);
-
-  reg_str = register_reg_to_str(reg);
-  rm_str = register_reg_to_str(rm);
-
-  special = modrm_is_disp_mod(uchar);
-
-  printf("Mode: %d Reg: %s RM: %s Special: %d\n", mod, reg_str,
-	 rm_str, special);
-
-  free(reg_str);
-  free(rm_str);
-
-  return 0;
-  }*/

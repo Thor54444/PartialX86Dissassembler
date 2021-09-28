@@ -116,36 +116,3 @@ char *register_reg_to_str(reg_t reg)
 end:
     return buf;
 }
-
-/*#include <stdio.h>
-
-int main() {
-  unsigned char chr = 0x03;
-  reg_t reg = register_uchar_to_reg(chr);
-  char *tmp;
-
-  if (reg != ebx) {
-    printf("Bad conversion\n");
-  }
-
-  tmp = register_reg_to_str(reg);
-
-  printf("Reg str: %s\n", tmp);
-
-  free(tmp);
-
-  reg = register_uchar_sect_to_reg(chr, 0);
-
-  if (reg != ebx) {
-    printf("Bad conversion\n");
-  }
-
-  chr = 0xE0;
-  reg = register_uchar_sect_to_reg(chr, 5);
-
-  if (reg != edi) {
-    printf("Bad conversion\n");
-  }
-
-  return 0;
-  }*/

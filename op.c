@@ -831,28 +831,3 @@ int op_op_arg_polarity(op_t op)
         break;
     }
 }
-
-/*#include <stdio.h>
-
-int main() {
-  unsigned char op_b = 0x29;
-  unsigned char op_b2 = 0xAE;
-  reg_t modrm_reg = ebx;
-  char *op_str;
-  op_t op;
-
-  //op = op_uchar_to_op(op_b);
-  op = op_uchar_uchar_to_op(op_b, op_b2);
-  //op = op_uchar_modrm_to_op(op_b, modrm_reg);
-  //op = op_uchar_uchar_modrm_to_op(op_b, op_b2, modrm_reg);
-
-  op_str = op_to_str(op);
-
-  printf("OP: %s\n", op_str);
-  printf("OP immediate: %d\n", op_has_immediate(op));
-  printf("OP has second byte: %d\n", op_has_second_byte(op));
-  printf("OP has modrm: %d\n", op_has_modrm(op));
-
-  free(op_str);
-  return 0;
-  }*/
