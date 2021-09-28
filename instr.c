@@ -200,13 +200,15 @@ int parse_immediate(unsigned char *buf, int max, instr_t *instr)
 int parse_jmp(instr_t *instr)
 {
     uint64_t mask = 0x00000000FFFFFFFF;
-    uint64_t tmp = instr->addr + instr->size + instr->disp;
+    uint64_t tmp = instr->addr;
     char *label;
     int amt;
 
     // Only the instructions that inheritly need a
     // displacement have jmp labels
     if (op_has_displacement(instr->op) == OP_BOOL_YES) {
+        tmp = tmp + instr->size + instr->disp;
+
         instr->dst_addr = (uint32_t)(tmp & mask);
 
         label = calloc(LABEL_MAX_LEN, 1);
