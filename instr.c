@@ -40,7 +40,7 @@ int parse_op(unsigned char *buf, int max, instr_t *instr) {
     instr->reg = op_op_get_reg(*buf);
 
     return 1;
-  } else if (op_need_second_byte(*buf) == OP_BOOL_YES) {
+  } else if (op_need_second_byte(instr->op) == OP_BOOL_YES) {
     if (max < 2) {
       return -1; // Not enough bytes given to parse
     }
@@ -71,7 +71,9 @@ int parse_modrm(unsigned char *buf, int max, op_t op, instr_t *instr) {
     /* Either you know for sure you need an modrm
      * or you use a modrm to identify the OP */
     instr->mode = modrm_get_mod(*buf);
-    instr->reg = modrm_get_reg(*buf);
+    if (op_op_has_reg(instr->op) != OP_BOOL_YES) {
+      instr->reg = modrm_get_reg(*buf);
+    }
     instr->rm = modrm_get_rm(*buf);
 
     if (op_need_modrm(op) == OP_BOOL_YES) {
@@ -126,8 +128,12 @@ int parse_displacement(unsigned char *buf, int max, instr_t *instr) {
     sz = modrm_get_displacement_size(instr->mode, instr->rm);
   }
   
-  if (op_has_displacement(instr->op) == OP_BOOL_YES) {
+  if (sz == 0 && op_has_displacement(instr->op) == OP_BOOL_YES) {
     sz = op_get_displacement_size(instr->op);
+  }
+
+  if (sz == 0 && sib_need_sib(instr->op, instr->mode, instr->rm)) {
+    sz = 4;
   }
 
   if (sz == 0 && (op_has_displacement(instr->op) == OP_BOOL_YES ||
@@ -225,8 +231,8 @@ void instr_clear_instr(instr_t *instr) {
   instr->scale = -1;
   instr->index = err_reg;
   instr->base = err_reg;
-  memset(&instr->imm, 0xFF, 4);
-  memset(&instr->disp, 0xFF, 4);
+  instr->imm = UINT32_MAX;
+  instr->disp = UINT32_MAX;
   instr->label = NULL;
   instr->dst_addr = UINT32_MAX;
 }
@@ -323,10 +329,13 @@ int instr_parse_instr(unsigned char *buf, int len, uint32_t start_addr, instr_t 
 }
 
 #define REG_ALONE_FORMAT "%s"
-#define REG_ACCESS_FORMAT "dword [ %s ]"
+#define REG_ACCESS_NO_DWORD_FORMAT "[%s]"
+#define REG_ACCESS_FORMAT "dword [%s]"
 #define REG_BYTE_FORMAT "[%s+0x%02"PRIu8"]"
 #define REG_DWORD_FORMAT "[%s+0x%08"PRIx32"]"
 #define REG_SPECIAL_FORMAT "[0x%08"PRIx32"]"
+#define REG_SIB_SCALE_ONLY_FORMAT "[%s%d]"
+#define REG_SIB_NO_BASE_FORMAT "[%s%d+0x%08"PRIx32"]"
 #define REG_SIB_BASE_NO_SCALE_FORMAT "[%s+%s+0x%08"PRIx32"]"
 #define REG_SIB_BASE_FORMAT "[%s+%s]"
 #define REG_SCALE_INDEX_FORMAT "[%s*%d+%s]"
@@ -347,6 +356,7 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   }
 
   if (reg.rm == err_reg) {
+    printf("rm is an error\n");
     return 0;
   }
 
@@ -357,22 +367,34 @@ int rm_to_str(instr_t reg, char **str_ptr) {
 
   if (modrm_is_special_displacement_mod(reg.mode, reg.rm)) {
     res = sprintf(tmp, REG_SPECIAL_FORMAT, reg.disp);
-
     goto str_check;
   }
   
   if (sib_need_sib(reg.op, reg.mode, reg.rm)) {
-    base = register_reg_to_str(reg.base);
-    if (base == NULL) {
+    index = register_reg_to_str(reg.index);
+    if (index == NULL) {
+      free(base);
       goto err_with_rm;
     }
-
-    if (reg.index == esp) {
-      res = sprintf(tmp, REG_DWORD_FORMAT, base, reg.disp);
+    
+    if (reg.base == ebp) {
+      if (reg.scale > 1) {
+	if (reg.disp != UINT32_MAX) {
+	  res = sprintf(tmp, REG_SIB_NO_BASE_FORMAT, index, reg.scale, reg.disp);
+	}  else {
+	  res = sprintf(tmp, REG_SIB_SCALE_ONLY_FORMAT, index, reg.scale);
+	}
+      } else {
+	if (reg.disp != UINT32_MAX) { 
+	  res = sprintf(tmp, REG_DWORD_FORMAT, index, reg.disp);
+	} else {
+	  goto err_with_rm;
+	}
+      }//Would do other addressing mode otherwise
     } else {
-      index = register_reg_to_str(reg.index);
-      if (index == NULL) {
-	free(base);
+      base = register_reg_to_str(reg.base);
+      if (base == NULL) {
+	free(index);
 	goto err_with_rm;
       }
       
@@ -392,13 +414,19 @@ int rm_to_str(instr_t reg, char **str_ptr) {
       
       free(base);
     }
-
+    free(index);
     goto str_check;
   }
  
-
   if (reg.mode == mem_access) {
-    res = sprintf(tmp, REG_ACCESS_FORMAT, rm);
+    res = op_op_arg_polarity(reg.op);
+
+    // If r/m is on the left, don't note dword access
+    if (res == OP_ARG_POL_LEFT) {
+      res = sprintf(tmp, REG_ACCESS_NO_DWORD_FORMAT, rm);
+    } else {
+      res = sprintf(tmp, REG_ACCESS_FORMAT, rm);
+    }
   } else if (reg.mode == byte_disp) {
     //res = sprintf(tmp, REG_BYTE_FORMAT, rm, (uint8_t)reg.disp);
     //The byte format is printed like the dword for some reason
@@ -408,6 +436,7 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   } else if (reg.mode == direct) {
     res = sprintf(tmp, REG_ALONE_FORMAT, rm);
   } else {
+    printf("Mode???");
     goto err_with_rm;
   }
 
@@ -420,6 +449,8 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   if (buf == NULL) {
     goto err_with_rm;
   }
+
+  printf("TMP: %s\n", tmp);
 
   memcpy(buf, tmp, strlen(tmp));
   free(rm);
@@ -434,10 +465,10 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   return -1;
 }
 
-#define INSTR_BYTES_SEC_MAX 18
+#define INSTR_BYTES_SEC_MAX 30
 #define MAX_INSTR_LINE_SIZE 256
 #define DB_FORMAT_STR "db %hx"
-#define EAX_ARG_STR "eax, "
+#define EAX_ARG_STR "eax,"
 #define EAX_LAST_ARG_STR ", eax"
 
 char *instr_reg_to_str(instr_t reg) {
@@ -463,7 +494,7 @@ char *instr_reg_to_str(instr_t reg) {
     goto err_with_addr;
   }
 
-  printf("ADDRESS: %s\n", addr);
+  //printf("ADDRESS: %s\n", addr);
   
   if (reg.op == err_op) {
     // db: byte
@@ -482,14 +513,14 @@ char *instr_reg_to_str(instr_t reg) {
     goto err_with_prefix;
   }
 
-  printf("HERE IS MY OP: %s\n", op);
+  //printf("HERE IS MY OP: %s\n", op);
 
   res = rm_to_str(reg, &rm);
   if (res < 0) {
     goto err_with_op;
   }
 
-  printf("HERE IS MY RM %s\n", rm);
+  //printf("HERE IS MY RM %s\n", rm);
   
   if (reg.reg != err_reg) {
     re = register_reg_to_str(reg.reg);
@@ -518,7 +549,7 @@ char *instr_reg_to_str(instr_t reg) {
     }
   }
 
-  printf("After immediate\n");
+  //printf("After immediate\n");
 
  make_instr:  
   memcpy(tmp, addr, 8);
@@ -547,7 +578,7 @@ char *instr_reg_to_str(instr_t reg) {
     tmp[loc++] = ' ';
   }
   
-  if (op == NULL) {
+  if (reg.op == err_op) {
     res = sprintf(tmp + loc, DB_FORMAT_STR, reg.instr_bytes[0]);
     loc += 5;
     
@@ -563,7 +594,7 @@ char *instr_reg_to_str(instr_t reg) {
     tmp[loc++] = ' ';
   }
 
-  printf("LABEL: %s\n", reg.label);
+  //printf("LABEL: %s\n", reg.label);
   
   if (reg.label != NULL) {
     memcpy(tmp + loc, reg.label, strlen(reg.label));
@@ -574,9 +605,9 @@ char *instr_reg_to_str(instr_t reg) {
 
   res = op_op_arg_polarity(reg.op);
 
-  printf("After pol func %d\n", res);
+  //printf("After pol func %d\n", res);
   if (res == OP_ARG_POL_RIGHT) {
-    printf("RIGHT\n");
+    //printf("RIGHT\n");
     memcpy(tmp + loc, re, strlen(re));
     loc += strlen(re);
     tmp[loc++] = ',';
@@ -593,7 +624,7 @@ char *instr_reg_to_str(instr_t reg) {
       loc += strlen(imm);
     }
   } else if (res == OP_ARG_POL_LEFT) {
-    printf("LEFT\n");
+    //printf("LEFT\n");
     memcpy(tmp + loc, rm, strlen(rm));
     loc += strlen(rm);
 
@@ -612,7 +643,7 @@ char *instr_reg_to_str(instr_t reg) {
       tmp[loc++] = '1';
     }
   } else if (res == OP_ARG_POL_ONLY) {
-    printf("ONLY\n");
+    printf("ONLY %s\n", rm);
     memcpy(tmp + loc, rm, strlen(rm));
     loc += strlen(rm);
 
@@ -624,21 +655,28 @@ char *instr_reg_to_str(instr_t reg) {
       loc += strlen(imm);
     }
   } else if (res == OP_ARG_POL_NONE) {
-    printf("Here?\n");
+    //printf("Here?\n");
     /* Instructions where the register is hardcoded eax */
-    if (reg.op == addd || reg.op == andd || reg.op == cmpd || reg.op == movd ||
-	reg.op == ord || reg.op == sbbd || reg.op == subd || reg.op == testd ||
-	reg.op == xord) {
+    if (reg.op == addd || reg.op == andd || reg.op == cmpd || reg.op == ord ||
+	reg.op == sbbd || reg.op == subd || reg.op == testd || reg.op == xord) {
       memcpy(tmp + loc, EAX_ARG_STR, strlen(EAX_ARG_STR));
       loc += strlen(EAX_ARG_STR);
 
       memcpy(tmp + loc, imm, strlen(imm));
       loc += strlen(imm);
-    } else if (reg.op == decr || reg.op == incr || reg.op == popr || reg.op == pushr) {
+    } else if (reg.op == decr || reg.op == incr || reg.op == popr || reg.op == pushr ||
+	       reg.op == movd) {
       memcpy(tmp + loc, re, strlen(re));
       loc += strlen(re);
+
+      if (reg.op == movd) {	
+	tmp[loc++] = ',';
+
+	memcpy(tmp + loc, imm, strlen(imm));
+	loc += strlen(imm);
+      }
+      
     } else if (imm != NULL) {
-      printf("Here?\n");
       memcpy(tmp + loc, imm, strlen(imm));
       loc += strlen(imm);
       
@@ -653,8 +691,8 @@ char *instr_reg_to_str(instr_t reg) {
   }
 
  make_return:
-  printf("TMP CONTAINS: %s\n", tmp);
   buf = calloc(strlen(tmp) + 1, 1);
+  //printf("TMP: %s\n", tmp);
   if (buf != NULL) {
     memcpy(buf, tmp, strlen(tmp));
   }
@@ -677,7 +715,7 @@ char *instr_reg_to_str(instr_t reg) {
 /*int main() {
   int res;
   char *tmp, *instr_str;
-  unsigned char instruction[] = {0x5D};
+  unsigned char instruction[] = {0x8D,0x35,0xCB,0x00,0x00,0x00};
   instr_t *result;
 
   res = instr_parse_instr(instruction, sizeof(instruction), 0, &result);
@@ -728,7 +766,7 @@ char *instr_reg_to_str(instr_t reg) {
   printf("INSTRUCTION LINE: \n%s\n", instr_str);
   free(instr_str);
   
-  instr_free_instr(&result);
+  instr_free_instr(result);
   
   return 0;
   }*/

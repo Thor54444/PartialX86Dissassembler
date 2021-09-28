@@ -14,15 +14,15 @@
 label_t *label_make_label(uint32_t addr, char *label) {
   label_t *label_tmp;
 
-  label_tmp = malloc(sizeof(label_t));
+  label_tmp = calloc(sizeof(label_t), 1);
   if (label_tmp) {
     label_tmp->addr = addr;
     label_tmp->label = calloc(MAX_LABEL_LENGTH + 1, 1);
-    if (label_tmp->label) {
+    if (label_tmp->label != NULL) {
       memcpy(label_tmp->label, label, MAX_LABEL_LENGTH);
     } else {
-      free(label);
-      label = NULL;
+      free(label_tmp);
+      label_tmp = NULL;
     }
   }
 

@@ -100,6 +100,7 @@ typedef enum op_t {
   /*These obviously are not true opcodes, this just represents the ambiguity with
    * parsing some opcodes in isolation */
   clflush_u, //clflush technically has an aditional value in the modrm required to confirm it
+  pop_u,
   mov_u,
   inc_dec_call_jmp_push, //0xFF
   idiv_imul_mul_neg_not_test, //0xF7

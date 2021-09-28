@@ -26,14 +26,16 @@ void main_print_output(ele_t *instr_list, ele_t *label_list) {
   do {
     instr = (instr_t *)cur_instr->value;
 
-    if (label_list != NULL) {
+    if (label_list != NULL && label_list->value != NULL) {
       cur_label = label_list;
       do {
 	label = (label_t *)cur_label->value;
+
 	if (instr->addr == label->addr) {
 	  printf("%s:\n", label->label);
 	  break;
 	}
+
       } while((cur_label = list_get_next(cur_label)) != NULL);
     }
 
@@ -45,7 +47,7 @@ void main_print_output(ele_t *instr_list, ele_t *label_list) {
     printf("%s\n", buf);
 
     free(buf);
-    
+
   } while((cur_instr = list_get_next(cur_instr)) != NULL);
 }
 
@@ -56,9 +58,11 @@ int main(int argc, char *argv[]) {
   ele_t *labels;
   char *filename = NULL;
 
-  while ((opt = getopt(argc, argv, "i")) != -1) {
+  while ((opt = getopt(argc, argv, "i:")) != -1) {
     switch (opt) {
-    case 'i': filename = optarg; break;
+    case 'i':
+      filename = optarg;
+      break;
     default:
       fprintf(stderr, "Usage: %s [-i]\n", argv[0]);
       return 1;
@@ -74,10 +78,13 @@ int main(int argc, char *argv[]) {
   if (res < 0) {
     return 3;
   }
-  
+
   main_print_output(instrs, labels);
 
+  printf("Successful return\n");
+  
   list_free_list(instrs, instr_free_instr);
   list_free_list(labels, label_free_label);
+
   return 0;
 }

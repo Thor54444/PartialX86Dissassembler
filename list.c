@@ -4,6 +4,7 @@
  * list.c
  ****************************/
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "list.h"
 
@@ -14,7 +15,7 @@ int list_add_element(ele_t *head, void *new_val) {
     head->value = new_val;
     return 0;
   } else if(head->next == NULL) {
-    head->next = calloc(sizeof(ele_t), 1);
+    head->next = calloc(1, sizeof(ele_t));
     if (head->next == NULL) {
       return -1;
     }
@@ -39,7 +40,7 @@ void list_free_list(ele_t *head, void (*free_ele)(void *)) {
     return;
   }
 
-  list_free_list(head, free_ele);
+  list_free_list(head->next, free_ele);
 
   free_ele(head->value);
   free(head);

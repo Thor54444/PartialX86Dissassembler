@@ -83,7 +83,7 @@ op_t op_uchar_to_op(unsigned char uchar) {
   case 0x33:
     return xorr;
   case 0x35:
-    return xori;
+    return xord;
   case 0x39:
     return cmpm;
   case 0x3B:
@@ -117,7 +117,7 @@ op_t op_uchar_to_op(unsigned char uchar) {
   case 0x8D:
     return lea;
   case 0x8F:
-    return popm;
+    return pop_u;
   case 0x90:
     return nop;
   case 0xA5:
@@ -255,6 +255,12 @@ op_t op_op_modrm_to_op(op_t op, reg_t modrm_reg_field) {
     } else {
       return err_op;
     }
+  case pop_u:
+    if (modrm_reg_field == eax) {
+      return popm;
+    } else {
+      return err_op;
+    }
   case mov_u:
     if (modrm_reg_field == eax) {
       return movi;
@@ -348,7 +354,7 @@ char *op_to_str(op_t op) {
   case popm ... popr:
     op_str = OP_POP_STR;
     break;
-  case pushm ... pushr:
+  case pushm ... pushi:
     op_str = OP_PUSH_STR;
     break;
   case cmpsd:
@@ -365,6 +371,9 @@ char *op_to_str(op_t op) {
     break;
   case sar:
     op_str = OP_SAR_STR;
+    break;
+  case shr:
+    op_str = OP_SHR_STR;
     break;
   case sbbd ... sbbr:
     op_str = OP_SBB_STR;
@@ -404,7 +413,7 @@ int op_need_second_byte(op_t op) {
   switch(op) {
   case clflush:
     return OP_BOOL_YES;
-  case imuli:
+  case imulr:
     return OP_BOOL_YES;
   case jz32:
     return OP_BOOL_YES;
@@ -432,6 +441,8 @@ int op_need_modrm(op_t op) {
   case clflush_u:
     return OP_BOOL_YES;
   case mov_u:
+    return OP_BOOL_YES;
+  case pop_u:
     return OP_BOOL_YES;
   case addi:
     return OP_BOOL_YES;
@@ -522,6 +533,8 @@ int op_has_modrm(op_t op) {
     return OP_BOOL_YES;
   case mov_u:
     return OP_BOOL_YES;
+  case pop_u:
+    return OP_BOOL_YES;
   case inc_dec_call_jmp_push ... clflush_imul_jz_jnz:
     return OP_BOOL_MAYBE;
   default:
@@ -534,8 +547,6 @@ int op_get_immediate_size(op_t op) {
   case addd ... addi:
     return 4;
   case andd ... andi:
-    return 4;
-  case callr:
     return 4;
   case cmpd ...cmpi:
     return 4;
@@ -571,8 +582,6 @@ int op_has_immediate(op_t op) {
   case addd ... addi:
     return OP_BOOL_YES;
   case andd ... andi:
-    return OP_BOOL_YES;
-  case callr:
     return OP_BOOL_YES;
   case cmpd ...cmpi:
     return OP_BOOL_YES;
@@ -632,6 +641,10 @@ int op_get_displacement_size(op_t op) {
     return 4;
   case jz8:
     return 1;
+  case jz32:
+    return 4;
+  case jnz8:
+    return 1;
   case jnz32:
     return 4;
   default:
@@ -649,6 +662,8 @@ int op_op_has_reg(op_t op) {
     return OP_BOOL_YES;
   case incr:
     return OP_BOOL_YES;
+  case movd:
+    return OP_BOOL_YES;
   default:
     return OP_BOOL_NO;
   }
@@ -664,6 +679,8 @@ switch(uchar) {
    return register_uchar_to_reg(uchar - 0x50);
  case 0x58 ... 0x5F:
    return register_uchar_to_reg(uchar - 0x58);
+ case 0xB8 ... 0xBF:
+   return register_uchar_to_reg(uchar - 0xB8);
  default:
    return err_reg;
   }    
@@ -720,11 +737,11 @@ int op_op_arg_polarity(op_t op) {
   case jmp8 ... jmpr:
     return OP_ARG_POL_NONE;
   case jmpm:
-    return OP_ARG_POL_NONE;
+    return OP_ARG_POL_ONLY;
   case jz8 ... jnz32:
     return OP_ARG_POL_NONE;
   case lea:
-    return OP_ARG_POL_ONLY;
+    return OP_ARG_POL_RIGHT;
   case movd:
     return OP_ARG_POL_NONE;
   case movi:
