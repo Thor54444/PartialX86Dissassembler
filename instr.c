@@ -356,7 +356,6 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   }
 
   if (reg.rm == err_reg) {
-    printf("rm is an error\n");
     return 0;
   }
 
@@ -436,7 +435,6 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   } else if (reg.mode == direct) {
     res = sprintf(tmp, REG_ALONE_FORMAT, rm);
   } else {
-    printf("Mode???");
     goto err_with_rm;
   }
 
@@ -449,8 +447,6 @@ int rm_to_str(instr_t reg, char **str_ptr) {
   if (buf == NULL) {
     goto err_with_rm;
   }
-
-  printf("TMP: %s\n", tmp);
 
   memcpy(buf, tmp, strlen(tmp));
   free(rm);
@@ -494,8 +490,6 @@ char *instr_reg_to_str(instr_t reg) {
     goto err_with_addr;
   }
 
-  //printf("ADDRESS: %s\n", addr);
-  
   if (reg.op == err_op) {
     // db: byte
     goto make_instr;
@@ -513,15 +507,11 @@ char *instr_reg_to_str(instr_t reg) {
     goto err_with_prefix;
   }
 
-  //printf("HERE IS MY OP: %s\n", op);
-
   res = rm_to_str(reg, &rm);
   if (res < 0) {
     goto err_with_op;
   }
 
-  //printf("HERE IS MY RM %s\n", rm);
-  
   if (reg.reg != err_reg) {
     re = register_reg_to_str(reg.reg);
     if (re == NULL) {
@@ -548,8 +538,6 @@ char *instr_reg_to_str(instr_t reg) {
       goto err_with_imm;
     }
   }
-
-  //printf("After immediate\n");
 
  make_instr:  
   memcpy(tmp, addr, 8);
@@ -594,20 +582,15 @@ char *instr_reg_to_str(instr_t reg) {
     tmp[loc++] = ' ';
   }
 
-  //printf("LABEL: %s\n", reg.label);
-  
   if (reg.label != NULL) {
     memcpy(tmp + loc, reg.label, strlen(reg.label));
     loc += strlen(reg.label);
-    printf("Skipping...\n");
     goto make_return;
   }
 
   res = op_op_arg_polarity(reg.op);
 
-  //printf("After pol func %d\n", res);
   if (res == OP_ARG_POL_RIGHT) {
-    //printf("RIGHT\n");
     memcpy(tmp + loc, re, strlen(re));
     loc += strlen(re);
     tmp[loc++] = ',';
@@ -624,7 +607,6 @@ char *instr_reg_to_str(instr_t reg) {
       loc += strlen(imm);
     }
   } else if (res == OP_ARG_POL_LEFT) {
-    //printf("LEFT\n");
     memcpy(tmp + loc, rm, strlen(rm));
     loc += strlen(rm);
 
@@ -643,7 +625,6 @@ char *instr_reg_to_str(instr_t reg) {
       tmp[loc++] = '1';
     }
   } else if (res == OP_ARG_POL_ONLY) {
-    printf("ONLY %s\n", rm);
     memcpy(tmp + loc, rm, strlen(rm));
     loc += strlen(rm);
 
@@ -655,7 +636,6 @@ char *instr_reg_to_str(instr_t reg) {
       loc += strlen(imm);
     }
   } else if (res == OP_ARG_POL_NONE) {
-    //printf("Here?\n");
     /* Instructions where the register is hardcoded eax */
     if (reg.op == addd || reg.op == andd || reg.op == cmpd || reg.op == ord ||
 	reg.op == sbbd || reg.op == subd || reg.op == testd || reg.op == xord) {
@@ -686,13 +666,11 @@ char *instr_reg_to_str(instr_t reg) {
       }
     }
   } else {
-    printf("Not a match???");
     goto err_with_imm;
   }
 
  make_return:
   buf = calloc(strlen(tmp) + 1, 1);
-  //printf("TMP: %s\n", tmp);
   if (buf != NULL) {
     memcpy(buf, tmp, strlen(tmp));
   }

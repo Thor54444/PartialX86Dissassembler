@@ -80,8 +80,6 @@ int main(int argc, char *argv[]) {
   }
 
   main_print_output(instrs, labels);
-
-  printf("Successful return\n");
   
   list_free_list(instrs, instr_free_instr);
   list_free_list(labels, label_free_label);

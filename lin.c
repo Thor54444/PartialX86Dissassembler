@@ -67,63 +67,48 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
     return -1;
   }
 
-  //  printf("Starting loop!\n");
-
   while (fread(holding_buffer + of_in, 1, 1, fp) == 1) {
     res = instr_parse_instr(holding_buffer, of_in + 1, addr, &tmp);
 
     if (res < 0) {
       if (of_in + 1 >= MAX_INSTR_LEN) {
-	printf("Gotta make db\n");
 	tmp = make_db_instr(addr, holding_buffer[0]);
 	if (tmp == NULL) {
-	  printf("Failed to make db\n");
 	  goto err;
 	}
 
-	//printf("Made DB\n");
-
 	res = list_add_element(instr_list, tmp);
 	if (res < 0) {
-	  printf("Cannot add db to list\n");
 	  goto err;
 	}
 	
 	//I know this is gross
-	//printf("Fseek?\n");
 	res = fseek(fp, -1 * (MAX_INSTR_LEN - 1), SEEK_CUR);
 	if (res < 0) {
-	  printf("failed to seek\n");
 	  goto err;
 	}
-	//printf("Fseek\n");
 
 	of_in = 0;
 	addr += 1;
       } else {
-	//printf("doesn't make sense\n");
 	of_in += 1;
       }
     } else {
       res = list_add_element(instr_list, tmp);
       addr += tmp->size;
-      //printf("Made instr!\n");
+
       if (res < 0) {
-	printf("Failed adding instr element\n");
 	goto err;
       }
 
       if (tmp->dst_addr != UINT32_MAX) {
-	printf("Making label for %s %"PRIu32"\n", tmp->label, tmp->dst_addr);
 	label = label_make_label(tmp->dst_addr, tmp->label);
 	if (label == NULL) {
-	  printf("Can't make label\n");
 	  goto err;
 	}
 
 	res = list_add_element(label_list, label);
 	if (res < 0) {
-	  printf("Failed adding element\n");
 	  goto err;
 	}
       }
@@ -131,8 +116,6 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
       of_in = 0;
     }
   }
-
-  printf("PAST LOOP %02X\n", *(holding_buffer + of_in));
 
   while(i <= of_in) {
     res = instr_parse_instr(holding_buffer, i + 1, addr, &tmp);
@@ -157,7 +140,6 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
       }
 
       if (tmp->dst_addr != UINT32_MAX) {
-	printf("Making label for %s %"PRIu32"\n", tmp->label, tmp->dst_addr);
 	label = label_make_label(tmp->dst_addr, tmp->label);
 	if (label == NULL) {
 	  goto err;
@@ -172,8 +154,6 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
       break;
     }
   }
-
-  //printf("Clean up!\n");
 
   fclose(fp);
   if (instr_list->value != NULL) {
