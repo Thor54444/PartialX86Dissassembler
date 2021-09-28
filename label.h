@@ -15,6 +15,6 @@ typedef struct label_t {
 
 label_t *label_make_label(uint32_t addr, char *label);
 
-void free_label(label_t *label); 
+void label_free_label(void *label); 
 
 #endif //__LABEL_H__

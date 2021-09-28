@@ -3,6 +3,8 @@
  * Project 1
  * list.c
  ****************************/
+#include <stdlib.h>
+
 #include "list.h"
 
 int list_add_element(ele_t *head, void *new_val) {

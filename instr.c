@@ -228,18 +228,16 @@ void instr_clear_instr(instr_t *instr) {
   memset(&instr->imm, 0xFF, 4);
   memset(&instr->disp, 0xFF, 4);
   instr->label = NULL;
-  instr->dst_addr = 0;
+  instr->dst_addr = UINT32_MAX;
 }
 
-void instr_free_instr(instr_t **instr_ptr) {
-  instr_t *instr;
-
-  if (instr_ptr == NULL || *instr_ptr == NULL) {
+void instr_free_instr(void *instr_ptr) {
+  if (instr_ptr == NULL) {
     return;
   }
-  
-  instr = *instr_ptr;
 
+  instr_t *instr = (instr_t *)instr_ptr;
+  
   free(instr->label);
   free(instr->instr_bytes);
   free(instr);
@@ -574,12 +572,6 @@ char *instr_reg_to_str(instr_t reg) {
     goto make_return;
   }
 
-  /*#define OP_ARG_POL_ONLY 0
-  #define OP_ARG_POL_LEFT 1
-  #define OP_ARG_POL_RIGHT 2
-  #define OP_ARG_POL_UNSURE 3
-  #define OP_ARG_POL_NONE 4*/
-
   res = op_op_arg_polarity(reg.op);
 
   printf("After pol func %d\n", res);
@@ -682,7 +674,7 @@ char *instr_reg_to_str(instr_t reg) {
   return buf;
 }
 
-int main() {
+/*int main() {
   int res;
   char *tmp, *instr_str;
   unsigned char instruction[] = {0x5D};
@@ -739,5 +731,5 @@ int main() {
   instr_free_instr(&result);
   
   return 0;
-}
+  }*/
 

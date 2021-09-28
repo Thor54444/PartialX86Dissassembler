@@ -4,9 +4,12 @@
  * lin.c
  ****************************/
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "lin.h"
+#include "list.h"
 #include "instr.h"
+#include "label.h"
 
 #define MAX_INSTR_LEN 13
 
@@ -20,13 +23,13 @@ instr_t *make_db_instr(uint32_t addr, unsigned char ch) {
 
   instr_clear_instr(instr);
 
-  instr->instr_buf = malloc(1);
-  if (instr->instr_buf = NULL) {
+  instr->instr_bytes = malloc(1);
+  if (instr->instr_bytes = NULL) {
     free(instr);
     return NULL;
   }
 
-  instr->instr_buf[0] = ch;
+  instr->instr_bytes[0] = ch;
   instr->addr = addr;
 
   return instr;
@@ -79,7 +82,7 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
 	}
 	
 	//I know this is gross
-	res = fseek(fp, -1 * (MAS_INSTR_LEN - 1), SEEK_CUR);
+	res = fseek(fp, -1 * (MAX_INSTR_LEN - 1), SEEK_CUR);
 	if (res < 0) {
 	  goto err;
 	}
@@ -91,13 +94,13 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
       }
     } else {
       res = list_add_element(instr_list, tmp);
-      addr += tmp.size;
+      addr += tmp->size;
       if (res < 0) {
 	goto err;
       }
 
       if (tmp->dst_addr != UINT32_MAX) {
-	label = label_make_label(tmp->dst_addr, tmp->addr);
+	label = label_make_label(tmp->dst_addr, tmp->label);
 	if (label == NULL) {
 	  goto err;
 	}
@@ -135,7 +138,7 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
       }
 
       if (tmp->dst_addr != UINT32_MAX) {
-	label = label_make_label(tmp->dst_addr, tmp->addr);
+	label = label_make_label(tmp->dst_addr, tmp->label);
 	if (label == NULL) {
 	  goto err;
 	}
@@ -158,7 +161,7 @@ int lin_parse_instructions(char *filename, ele_t **instrs, ele_t **labels) {
   
  err:
   fclose(fp);
-  list_free_list(instr_list, instr_free_instr() );
-  list_free_list(label_list, label_free_label() );
+  list_free_list(instr_list, instr_free_instr);
+  list_free_list(label_list, label_free_label);
   return -1;
 }

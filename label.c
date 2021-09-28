@@ -3,27 +3,35 @@
  * Project 1
  * label.c
  ****************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "label.h"
+
 #define MAX_LABEL_LENGTH 16
 
 label_t *label_make_label(uint32_t addr, char *label) {
-  label_t *label;
+  label_t *label_tmp;
 
-  label = malloc(sizeof(label_t));
-  if (label) {
-    label->addr = addr;
-    label->label = calloc(MAX_LABEL_LENGTH + 1, 1);
-    if (label->label) {
-      memcpy(label->label, label, MAX_LABEL_LENGTH);
+  label_tmp = malloc(sizeof(label_t));
+  if (label_tmp) {
+    label_tmp->addr = addr;
+    label_tmp->label = calloc(MAX_LABEL_LENGTH + 1, 1);
+    if (label_tmp->label) {
+      memcpy(label_tmp->label, label, MAX_LABEL_LENGTH);
     } else {
       free(label);
       label = NULL;
     }
   }
 
-  return label;
+  return label_tmp;
 }
 
-void free_label(label_t *label) {
-  free(label->label);
-  free(label);
+void label_free_label(void *label) {
+  label_t *val = (label_t *)label;
+  
+  free(val->label);
+  free(val);
 }
