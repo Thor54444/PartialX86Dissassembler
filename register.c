@@ -19,99 +19,102 @@
 #define REG_ERR_STR "err"
 #define REG_STR_SIZE 3
 
-reg_t register_uchar_to_reg(unsigned char uchar) {
-  switch(uchar) {
-  case 0:
-    return eax;
-  case 1:
-    return ecx;
-  case 2:
-    return edx;
-  case 3:
-    return ebx;
-  case 4:
-    return esp;
-  case 5:
-    return ebp;
-  case 6:
-    return esi;
-  case 7:
-    return edi;
-  default:
-    return err_reg;
-  }
+reg_t register_uchar_to_reg(unsigned char uchar)
+{
+    switch(uchar) {
+    case 0:
+        return eax;
+    case 1:
+        return ecx;
+    case 2:
+        return edx;
+    case 3:
+        return ebx;
+    case 4:
+        return esp;
+    case 5:
+        return ebp;
+    case 6:
+        return esi;
+    case 7:
+        return edi;
+    default:
+        return err_reg;
+    }
 }
 
-reg_t register_uchar_sect_to_reg(unsigned char uchar, int start_bit) {
-  unsigned char mask;
+reg_t register_uchar_sect_to_reg(unsigned char uchar, int start_bit)
+{
+    unsigned char mask;
 
-  switch(start_bit) {
-  case 0:
-    mask = 0x07;
-    break;
-  case 1:
-    mask = 0x0E;
-    break;
-  case 2:
-    mask = 0x1C;
-    break;
-  case 3:
-    mask = 0x38;
-    break;
-  case 4:
-    mask = 0x70;
-    break;
-  case 5:
-    mask = 0xE0;
-    break;
-  default:
-    return err_reg;
-  }
+    switch(start_bit) {
+    case 0:
+        mask = 0x07;
+        break;
+    case 1:
+        mask = 0x0E;
+        break;
+    case 2:
+        mask = 0x1C;
+        break;
+    case 3:
+        mask = 0x38;
+        break;
+    case 4:
+        mask = 0x70;
+        break;
+    case 5:
+        mask = 0xE0;
+        break;
+    default:
+        return err_reg;
+    }
 
-  return register_uchar_to_reg((uchar & mask) >> start_bit);
+    return register_uchar_to_reg((uchar & mask) >> start_bit);
 }
 
-char *register_reg_to_str(reg_t reg) {
-  char *buf = calloc(REG_STR_SIZE + 1, 1), *str;
+char *register_reg_to_str(reg_t reg)
+{
+    char *buf = calloc(REG_STR_SIZE + 1, 1), *str;
 
-  if (buf == NULL) {
-    goto end;
-  }
+    if (buf == NULL) {
+        goto end;
+    }
 
-  switch(reg) {
-  case eax:
-    str = REG_EAX_STR;
-    break;
-  case ecx:
-    str = REG_ECX_STR;
-    break;
-  case edx:
-    str = REG_EDX_STR;
-    break;
-  case ebx:
-    str = REG_EBX_STR;
-    break;
-  case esp:
-    str = REG_ESP_STR;
-    break;
-  case ebp:
-    str = REG_EBP_STR;
-    break;
-  case esi:
-    str = REG_ESI_STR;
-    break;
-  case edi:
-    str = REG_EDI_STR;
-    break;
-  case err_reg:
-    str = REG_ERR_STR;
-    break;
-  }
+    switch(reg) {
+    case eax:
+        str = REG_EAX_STR;
+        break;
+    case ecx:
+        str = REG_ECX_STR;
+        break;
+    case edx:
+        str = REG_EDX_STR;
+        break;
+    case ebx:
+        str = REG_EBX_STR;
+        break;
+    case esp:
+        str = REG_ESP_STR;
+        break;
+    case ebp:
+        str = REG_EBP_STR;
+        break;
+    case esi:
+        str = REG_ESI_STR;
+        break;
+    case edi:
+        str = REG_EDI_STR;
+        break;
+    case err_reg:
+        str = REG_ERR_STR;
+        break;
+    }
 
-  memcpy(buf, str, REG_STR_SIZE);
+    memcpy(buf, str, REG_STR_SIZE);
 
- end:
-  return buf;
+end:
+    return buf;
 }
 
 /*#include <stdio.h>
