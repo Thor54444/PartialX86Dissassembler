@@ -1,13 +1,10 @@
-Project 1
-Andrew Guinn
-695.744
+This project contains a dissassembler I wrote for a project in a reverse engineering class at JHU.
+It handles a subset of different features of X86. It is by no means perfect.
 
-This directory constitutes the contents of my submission for Project 1.
+This project is written in C with no dependencies required, except for a switch case handling feature
+introduced in later C specifications. Any recent version of gcc should be able to compile it no issue.
 
-The project is written in C. I did not download any new libraries, so as long as you
-have gcc and make you should be able to build this project. The project comes with a basic
-Makefile. Simply invoke `make` on the command line to build disasm and invoke `make clean`
-to remove disasm. The binary should be runnable with the one argument given in the project spec.
+This project can be built by invoking `make` in the project directory.
 
 A quick summary of the files and their contents:
 register.c/.h - functions and types relevant to register parsing
@@ -21,8 +18,3 @@ label.c/.h - implementation of a supporting struct that holds labels and corresp
              printing step
 list.c/.h - barebones implementation of a linked list with desired functionality
 main.c/.h - main; handles command line input and instruction printing
-
-This directory is also a local git repo, so the full history of development should also be browsable, if
-so desired.
-
-The written response document is also located in this directory in the file "guinn_proj1_submission.pdf."
